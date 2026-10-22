@@ -1,0 +1,28 @@
+{
+  "name": "awtad-bd-hub",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Awtad Advance Business Development Hub",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js",
+    "digest": "node scripts/run-digest.js"
+  },
+  "dependencies": {
+    "connect-pg-simple": "^9.0.1",
+    "exceljs": "^4.4.0",
+    "express": "^4.22.3",
+    "express-rate-limit": "^7.5.1",
+    "express-session": "^1.19.0",
+    "helmet": "^7.2.0",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.10.1",
+    "pg": "^8.23.0"
+  }
+}

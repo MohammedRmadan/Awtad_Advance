@@ -1,0 +1,85 @@
+# Awtad BD Hub – production stack for a Linux VPS
+# app (Node.js) + PostgreSQL 16 + Caddy (automatic HTTPS) + nightly backups
+# Normally managed by deploy/linux/install.sh and the "bdhub" command.
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_DB: bdhub
+      POSTGRES_USER: bdhub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      TZ: Asia/Riyadh
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bdhub -d bdhub"]
+      interval: 10s
+      retries: 10
+
+  app:
+    build: .
+    image: awtad/bd-hub:2.0.0
+    restart: unless-stopped
+    logging: *logging
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://bdhub:${POSTGRES_PASSWORD}@db:5432/bdhub
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8080"
+      TRUST_PROXY: "1"
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      # Your domain (e.g. bdhub.awtad.com.sa) for automatic HTTPS, or ":80" for plain HTTP by IP
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      MAX_BODY: ${MAX_BODY:-30MB}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+      TZ: Asia/Riyadh
+    volumes:
+      - ./backups:/backups
+      - uploads:/uploads:ro
+      - ./scripts/backup.sh:/backup.sh:ro
+    # 02:15 every night (Asia/Riyadh)
+    entrypoint: ["/bin/sh", "-c", "echo '15 2 * * * /bin/sh /backup.sh >> /backups/backup.log 2>&1' | crontab - && crond -f -l 8"]
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:

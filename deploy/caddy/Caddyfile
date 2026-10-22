@@ -1,0 +1,15 @@
+# SITE_ADDRESS comes from .env: a domain name (HTTPS certificate issued and renewed automatically) or ":80".
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	request_body {
+		max_size {$MAX_BODY}
+	}
+	reverse_proxy app:8080 {
+		# keep live updates (server-sent events) streaming
+		flush_interval -1
+	}
+	log {
+		output stdout
+		format console
+	}
+}

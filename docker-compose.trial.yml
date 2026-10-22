@@ -1,0 +1,46 @@
+# Trial run on a laptop or any PC with Docker Desktop – no domain, no TLS.
+# Sign in: admin / Trial-Admin-2026  (you will be asked to choose a new password)
+# Start:  docker compose -f docker-compose.trial.yml up -d --build
+# Open:   http://localhost:8080
+# Stop:   docker compose -f docker-compose.trial.yml down        (add -v to wipe the trial data)
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bdhub
+      POSTGRES_USER: bdhub
+      POSTGRES_PASSWORD: trial-only
+      TZ: Asia/Riyadh
+    volumes:
+      - trial_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bdhub -d bdhub"]
+      interval: 5s
+      retries: 20
+
+  app:
+    build: .
+    image: awtad/bd-hub:trial
+    environment:
+      NODE_ENV: development
+      INITIAL_ADMIN_USERNAME: admin
+      INITIAL_ADMIN_PASSWORD: Trial-Admin-2026
+      BASE_URL: http://localhost:8080
+      PORT: "8080"
+      DATABASE_URL: postgres://bdhub:trial-only@db:5432/bdhub
+      SESSION_SECRET: trial-only-secret-not-for-production-0000
+      MAIL_MODE: none
+      TZ: Asia/Riyadh
+    # Loads the workbook data on first start (safe to repeat), then starts the server
+    command: ["sh", "-c", "node scripts/seed.js && node src/server.js"]
+    volumes:
+      - trial_uploads:/data/uploads
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  trial_pgdata:
+  trial_uploads:
